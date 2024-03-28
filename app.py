@@ -1,29 +1,35 @@
-from flask import Flask, request, jsonify
-import pandas as pd
-import joblib
+from flask import Flask, request, jsonify, render_template
+from pymongo import MongoClient
 
 app = Flask(__name__)
 
-# Load the trained model
-model = joblib.load('trained_model.pkl')
+# Connect to MongoDB
+client = MongoClient('mongodb://localhost:27017/')
+db = client['user_database']
+collection = db['users']
 
-@app.route('/predict', methods=['POST'])
-def predict():
-    try:
-        # Get the JSON data sent by the client
-        data = request.get_json()
-        
-        # Convert the JSON data to a DataFrame
-        input_data = pd.DataFrame(data, index=[0])
-        
-        # Make predictions
-        predictions = model.predict(input_data)
-        
-        # Return the predictions as JSON
-        return jsonify({'predictions': predictions.tolist()})
+# Route to serve the HTML file
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+# Route to handle form submission
+@app.route('/submit', methods=['POST'])
+def submit_data():
+    data = request.form  # Get form data
+    name = data.get('name')
+    email = data.get('email')
+    print(name)
     
-    except Exception as e:
-        return jsonify({'error': str(e)}), 400
+    # Insert data into MongoDB
+    user_data = {
+        'name': name,
+        'email': email
+    }
+    result = collection.insert_one(user_data)
+    
+    return jsonify({"message": "Data stored successfully", "userID": str(result.inserted_id)}), 200
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)
+
